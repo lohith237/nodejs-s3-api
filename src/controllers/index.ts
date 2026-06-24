@@ -1,0 +1,1 @@
+export {createUser,getAllUsers,getUserById,updateUser,deleteUser,Login} from "./userController"
