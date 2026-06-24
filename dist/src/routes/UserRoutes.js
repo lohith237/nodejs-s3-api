@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.UserRoute = void 0;
+const express_1 = require("express");
+const controllers_1 = require("../controllers");
+const s3_1 = require("../../config/s3");
+const middlewares_1 = require("../middlewares");
+const UserRoute = (0, express_1.Router)();
+exports.UserRoute = UserRoute;
+UserRoute.post("/", (0, s3_1.createUploader)("user").single("image"), controllers_1.createUser);
+UserRoute.post("/login", controllers_1.Login);
+UserRoute.get("/", middlewares_1.AuthMiddleware, controllers_1.getAllUsers);
+UserRoute.get("/:id", middlewares_1.AuthMiddleware, controllers_1.getUserById);
+UserRoute.patch("/:id", (0, s3_1.createUploader)("user").single("image"), controllers_1.updateUser);
+UserRoute.delete("/:id", middlewares_1.AuthMiddleware, controllers_1.deleteUser);
