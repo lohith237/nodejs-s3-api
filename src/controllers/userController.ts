@@ -1,17 +1,18 @@
-import { s3,deleteFromS3,replaceS3Image } from "../../config/s3";
+import { s3, deleteFromS3, replaceS3Image } from "../../config/s3";
 import { User } from "../modals";
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken"
+import { sendEmail } from "../utils/sendEmail";
 export const createUser = async (req: Request, res: Response) => {
     try {
-        const { name, email,password } = req.body
+        const { name, email, password } = req.body
         const existUser = await User.findOne({ email })
         if (existUser) {
             await deleteFromS3(req.file);
             return res.status(400).json({ message: "User Alredy Exists" })
         }
         const user = await User.create({
-            name, email,password,image: req.file ? (req.file as any)?.location : null
+            name, email, password, image: req.file ? (req.file as any)?.location : null
         })
         res.status(201).json({ message: "user Created", user })
     }
@@ -22,17 +23,22 @@ export const createUser = async (req: Request, res: Response) => {
 }
 export const Login = async (req: Request, res: Response) => {
     try {
-        const { email,password} = req.body
+        const { email, password } = req.body
         const existUser = await User.findOne({ email })
         if (!existUser) {
             return res.status(400).json({ message: "Invalid credentials" })
         }
-        const isMatch=existUser.comparePassword(password as string)
-        if(!isMatch){
-          return res.status(400).json({ message: "Invalid credentials" })
+        const isMatch = existUser.comparePassword(password as string)
+        if (!isMatch) {
+            return res.status(400).json({ message: "Invalid credentials" })
         }
-        const token=await jwt.sign({user_id:existUser?._id,role:existUser.role},process.env.JWT_SECRET as string,{expiresIn:"15m"})
-        res.status(200).json({message:"Login success",user:existUser,token:token})
+        await sendEmail(
+            existUser.email,
+            'Login Successful',
+            `Hi ${existUser.name}, you have successfully logged in to your account.`
+        )
+        const token = await jwt.sign({ user_id: existUser?._id, role: existUser.role }, process.env.JWT_SECRET as string, { expiresIn: "15m" })
+        res.status(200).json({ message: "Login success", user: existUser, token: token })
     }
     catch (error) {
         await deleteFromS3(req.file);
@@ -52,8 +58,8 @@ export const getAllUsers = async (req: Request, res: Response) => {
 export const getUserById = async (req: Request, res: Response) => {
     try {
         const user = await User.findById(req.params.id)
-        if(!user){
-        return res.status(404).json({message:"User Not found"})
+        if (!user) {
+            return res.status(404).json({ message: "User Not found" })
         }
         res.status(200).json({ message: "", user })
     }
@@ -63,7 +69,7 @@ export const getUserById = async (req: Request, res: Response) => {
 }
 export const updateUser = async (req: Request, res: Response) => {
     try {
-        const { email, name,password } = req.body
+        const { email, name, password } = req.body
         const existUser = await User.findById(req.params.id)
         if (!existUser) {
             await deleteFromS3(req.file);
@@ -77,7 +83,7 @@ export const updateUser = async (req: Request, res: Response) => {
             }
         }
         await replaceS3Image(existUser?.image)
-        const updateUser = await User.findByIdAndUpdate(req.params.id, { $set: { email, name,password,image: req.file ? (req.file as any).location : existUser.image } }, { returnDocument: 'after' })
+        const updateUser = await User.findByIdAndUpdate(req.params.id, { $set: { email, name, password, image: req.file ? (req.file as any).location : existUser.image } }, { returnDocument: 'after' })
         res.status(200).json({ message: "user Updated SuccessFully", user: updateUser })
     }
     catch (error) {
@@ -97,7 +103,7 @@ export const deleteUser = async (req: Request, res: Response) => {
         }
         await replaceS3Image(existUser?.image)
         await User.findByIdAndDelete(req.params.id)
-        res.status(200).json({message:"Deleted successfully"})
+        res.status(200).json({ message: "Deleted successfully" })
     }
     catch (error) {
         res.status(500).json({ message: "internal Server issue" })
