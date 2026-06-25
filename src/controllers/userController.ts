@@ -41,7 +41,7 @@ export const Login = async (req: Request, res: Response) => {
         res.status(200).json({ message: "Login success", user: existUser, token: token })
     }
     catch (error) {
-        await deleteFromS3(req.file);
+        console.log(error)
         res.status(500).json({ message: "internal server" })
     }
 }
