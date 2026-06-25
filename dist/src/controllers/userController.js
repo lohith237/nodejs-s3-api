@@ -16,6 +16,7 @@ exports.deleteUser = exports.updateUser = exports.getUserById = exports.getAllUs
 const s3_1 = require("../../config/s3");
 const modals_1 = require("../modals");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const sendEmail_1 = require("../utils/sendEmail");
 const createUser = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
@@ -47,6 +48,7 @@ const Login = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
         if (!isMatch) {
             return res.status(400).json({ message: "Invalid credentials" });
         }
+        yield (0, sendEmail_1.sendEmail)(existUser.email, 'Login Successful', `Hi ${existUser.name}, you have successfully logged in to your account.`);
         const token = yield jsonwebtoken_1.default.sign({ user_id: existUser === null || existUser === void 0 ? void 0 : existUser._id, role: existUser.role }, process.env.JWT_SECRET, { expiresIn: "15m" });
         res.status(200).json({ message: "Login success", user: existUser, token: token });
     }
