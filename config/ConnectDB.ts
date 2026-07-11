@@ -1,14 +1,20 @@
-import mongoose from "mongoose";
+import mongoose, { Connection } from "mongoose";
 
+let masterConnection: Connection;
 
-const ConnectDB=async()=>{
-    try{
-       const connect=await mongoose.connect(process.env.MONGO_URI as string)
-       console.log(`MongoDB Connected: ${connect.connection.host}`);
+const connectMasterDB = async () => {
+    try {
+        const connect = await mongoose.connect(process.env.MONGO_URI as string);
+        masterConnection = connect.connection;
+        console.log(`MongoDB Connected: ${masterConnection.host}`);
+    } catch (error) {
+        console.log(error);
+        process.exit(1);
     }
-    catch(error){
-        console.log(error)
-        process.exit(1)
-    }
-}
-export {ConnectDB}
+};
+
+const getMasterDB = (): Connection => {
+    return masterConnection;
+};
+
+export { connectMasterDB, getMasterDB };

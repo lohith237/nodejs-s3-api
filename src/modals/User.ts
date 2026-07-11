@@ -1,29 +1,56 @@
-import { Schema, model } from "mongoose"
-import { userType } from "../types"
+// models/User.ts
+import { Schema } from "mongoose";
 import bcrypt from "bcrypt";
-const Userschema = new Schema<userType>({
+import { userType } from "../types";
+export const User = new Schema<userType>({
     name: {
         required: true,
         type: String
     },
     email: {
         required: true,
-        type: String
+        type: String,
+        unique: true
     },
     image: {
-        required: true,
         type: String
     },
     password: {
         required: true,
         type: String
+    },
+    role: {
+        required: true,
+        type: String,
+        enum: ["admin", "client", "manager", "employee"],
+        default: "employee"
+    },
+    tenant_id: {
+        required: true,
+        type: String
+    },
+    company_name: {
+        type: String
+    },
+    subdomain: {
+        type: String,
+        lowercase: true,
+        trim: true
+    },
+    database: {
+        type: String
+    },
+    is_active: {
+        type: Boolean,
+        default: true
     }
-}, { timestamps: true })
-Userschema.pre("save", async function(){
-    if (!this.isModified('password')) return;
+}, { timestamps: true });
+
+User.pre("save", async function () {
+    if (!this.isModified("password")) return;
     this.password = await bcrypt.hash(this.password, 10);
-})
-Userschema.methods.comparePassword = async function (password: string) {
-  return await bcrypt.compare(password, this.password);
+});
+
+User.methods.compare_password = async function (password: string) {
+    return await bcrypt.compare(password, this.password);
 };
-export const User = model<userType>("User", Userschema)

@@ -4,9 +4,7 @@ import dotenv from "dotenv"
 dotenv.config({
     path:".env.staging"
 })
-import { ConnectDB } from "../config/ConnectDB"
 import { UserRoute } from "./routes"
-ConnectDB();
 const App=express()
 App.use(cors())
 App.use(express.json())
