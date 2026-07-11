@@ -5,14 +5,11 @@ const getTenantDB = async (tenant_id: string): Promise<Connection> => {
         if (tenantConnections[tenant_id]) {
             return tenantConnections[tenant_id];
         }
-
-        const uri = `${process.env.MONGO_TENANT_BASE_URI}/${tenant_id}`;
+        const uri = `${process.env.MONGO_URI}/${tenant_id}`;
         const connection = mongoose.createConnection(uri);
-
         connection.on("connected", () => {
             console.log(`Tenant DB Connected: ${tenant_id}`);
         });
-
         connection.on("error", (error) => {
             console.log(`Tenant DB Error (${tenant_id}):`, error);
         });
