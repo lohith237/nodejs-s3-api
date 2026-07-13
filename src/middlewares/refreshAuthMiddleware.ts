@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { json } from "node:stream/consumers";
 const refreshAuthMiddleware = (req: Request, res: Response, next: NextFunction) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) {
@@ -11,7 +12,7 @@ const refreshAuthMiddleware = (req: Request, res: Response, next: NextFunction) 
     }) as any;
     next();
   } catch (err:any) {
-    return res.status(401).json({ message: err || "Invalid token" });
+    return res.status(401).json({ message: JSON.stringify(err) || "Invalid token" });
   }
 };
 
