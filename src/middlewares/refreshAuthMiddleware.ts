@@ -10,8 +10,8 @@ const refreshAuthMiddleware = (req: Request, res: Response, next: NextFunction) 
       ignoreExpiration: true,
     }) as any;
     next();
-  } catch (err:any) {
-    return res.status(401).json({ message: JSON.stringify(err) || "Invalid token",token });
+  } catch (err) {
+    next({ statusCode: 401, message: "Invalid token" });
   }
 };
 
