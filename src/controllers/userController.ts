@@ -220,7 +220,7 @@ export const RefreshToken = async (req: Request, res: Response, next: NextFuncti
     try {
         const user = req.user
         if (!user) {
-            return next({ statusCode: 401, message: "Invalid token" });
+            return next({ statusCode: 401, message: user });
         }
         const newToken = jwt.sign(
             {
