@@ -9,7 +9,7 @@ import { connectMasterDB } from "../config/ConnectDB"
 import { errorMiddleware,requestTimer } from "./middlewares"
 const App=express()
 App.use(cors({
-  origin: /\.lohithdev\.site$/,
+  origin: [/\.lohithdev\.site$/, "http://localhost:5173"],
   credentials: true,
   allowedHeaders: ["Content-Type", "Authorization", "subdomain"],
 }));
