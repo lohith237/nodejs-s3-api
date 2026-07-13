@@ -1,14 +1,14 @@
 import { s3, deleteFromS3, replaceS3Image } from "../../config/s3";
 import { getUserModel } from "../modals/getUserModel";
-import { resolveDB } from "../utils";
-import { Request, Response } from "express";
+import { resolveDB, paginateAndSearch } from "../utils";
+import { PaginateOptions } from "../types";
+import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-export const createUser = async (req: Request, res: Response) => {
+
+export const createUser = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { name, email, password, role, company_name, subdomain, tenant_id } = req.body;
-
         let final_tenant_id: string;
-
         if (role === "admin") {
             final_tenant_id = "master";
         } else if (role === "client") {
@@ -17,17 +17,13 @@ export const createUser = async (req: Request, res: Response) => {
         } else {
             final_tenant_id = tenant_id;
         }
-
         const db = await resolveDB("master");
         const User = getUserModel(db);
-
         const existUser = await User.findOne({ email });
-
         if (existUser) {
             await deleteFromS3(req.file);
-            return res.status(400).json({ message: "User Already Exists" });
+            return next({ statusCode: 400, message: "User Already Exists" });
         }
-
         const user = await User.create({
             name,
             email,
@@ -38,69 +34,93 @@ export const createUser = async (req: Request, res: Response) => {
             subdomain,
             image: req.file ? (req.file as any)?.location : null,
         });
-
         res.status(201).json({ message: "user Created", user });
     } catch (error: any) {
         await deleteFromS3(req.file);
-        res.status(500).json({ message: error.message || "internal server" });
+        next({ statusCode: 500, message: error.message || "internal server" });
     }
 };
-
-export const Login = async (req: Request, res: Response) => {
+export const Login = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { email, password } = req.body;
-
+        const subdomain = req.headers.subdomain as string;
+        if (!subdomain) {
+            return next({ statusCode: 400, message: "Subdomain header missing" });
+        }
         const db = await resolveDB("master");
         const User = getUserModel(db);
-
         const existUser = await User.findOne({ email });
-
         if (!existUser) {
-            return res.status(400).json({ message: "Invalid credentials" });
+            return next({ statusCode: 400, message: "Invalid credentials" });
         }
-
+        if (existUser.subdomain !== subdomain) {
+            return next({ statusCode: 403, message: "Unauthorized client domain" });
+        }
+        if (!existUser.is_active) {
+            return next({ statusCode: 403, message: "Account is inactive" });
+        }
         const isMatch = await existUser.compare_password(password as string);
-
         if (!isMatch) {
-            return res.status(400).json({ message: "Invalid credentials" });
+            return next({ statusCode: 400, message: "Invalid credentials" });
         }
-
         const token = jwt.sign(
             {
                 user_id: existUser._id,
                 role: existUser.role,
                 tenant_id: existUser.tenant_id,
+                subdomain: existUser.subdomain,
             },
             process.env.JWT_SECRET as string,
             {
                 expiresIn: "15m",
             }
         );
-
         res.status(200).json({
             message: "Login success",
             user: existUser,
             token,
         });
     } catch (error: any) {
-        res.status(500).json({ message: error.message || "internal server" });
+        next({ statusCode: 500, message: error.message || "internal server" });
     }
 };
-
-export const getAllUsers = async (req: Request, res: Response) => {
+export const getAllUsers = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const db = await resolveDB("master");
         const User = getUserModel(db);
-
-        const users = await User.find({});
-
-        res.status(200).json({ message: "", users });
-    } catch (error) {
-        res.status(500).json({ message: "internal Server issue" });
+        const {
+            page = "1",
+            page_size = "20",
+            search = "",
+            role,
+            is_active,
+        } = req.query;
+        const filter: Record<string, any> = {};
+        if (role) filter.role = role;
+        if (is_active !== undefined) filter.is_active = is_active === "true";
+        const options: PaginateOptions = {
+            page: Number(page),
+            pageSize: Number(page_size),
+            search: search as string,
+            searchFields: ["name", "email", "company_name"],
+            filter,
+            sort: { _id: -1 },
+            baseUrl: `${process.env.NODE_ENV === "production" ? "https" : req.protocol}://${req.get("host")}${req.baseUrl}${req.path}`,
+            originalQuery: req.query,
+        };
+        const result = await paginateAndSearch(User, options);
+        res.status(200).json({
+            count: result.total,
+            next: result.next,
+            prev: result.previous,
+            results: result.results,
+        });
+    } catch (error: any) {
+        next({ statusCode: 500, message: error.message || "internal Server issue" });
     }
 };
 
-export const getUserById = async (req: Request, res: Response) => {
+export const getUserById = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const db = await resolveDB("master");
         const User = getUserModel(db);
@@ -108,16 +128,16 @@ export const getUserById = async (req: Request, res: Response) => {
         const user = await User.findById(req.params.id);
 
         if (!user) {
-            return res.status(404).json({ message: "User Not found" });
+            return next({ statusCode: 404, message: "User Not found" });
         }
 
         res.status(200).json({ message: "", user });
     } catch (error) {
-        res.status(500).json({ message: "internal Server issue" });
+        next({ statusCode: 500, message: "internal Server issue" });
     }
 };
 
-export const updateUser = async (req: Request, res: Response) => {
+export const updateUser = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const db = await resolveDB("master");
         const User = getUserModel(db);
@@ -128,7 +148,7 @@ export const updateUser = async (req: Request, res: Response) => {
 
         if (!existUser) {
             await deleteFromS3(req.file);
-            return res.status(404).json({ message: "User Not Found" });
+            return next({ statusCode: 404, message: "User Not Found" });
         }
 
         if (email !== existUser.email) {
@@ -136,7 +156,7 @@ export const updateUser = async (req: Request, res: Response) => {
 
             if (emailTaken) {
                 await deleteFromS3(req.file);
-                return res.status(400).json({ message: "User Already Exists" });
+                return next({ statusCode: 400, message: "User Already Exists" });
             }
         }
 
@@ -162,11 +182,11 @@ export const updateUser = async (req: Request, res: Response) => {
             user: updatedUser,
         });
     } catch (error) {
-        res.status(500).json({ message: "internal Server issue" });
+        next({ statusCode: 500, message: "internal Server issue" });
     }
 };
 
-export const deleteUser = async (req: Request, res: Response) => {
+export const deleteUser = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const db = await resolveDB("master");
         const User = getUserModel(db);
@@ -174,7 +194,7 @@ export const deleteUser = async (req: Request, res: Response) => {
         const existUser = await User.findById(req.params.id);
 
         if (!existUser) {
-            return res.status(404).json({ message: "User Not Found" });
+            return next({ statusCode: 404, message: "User Not Found" });
         }
 
         if (existUser.image) {
@@ -192,6 +212,31 @@ export const deleteUser = async (req: Request, res: Response) => {
 
         res.status(200).json({ message: "Deleted successfully" });
     } catch (error) {
-        res.status(500).json({ message: "internal Server issue" });
+        next({ statusCode: 500, message: "internal Server issue" });
+    }
+};
+
+export const RefreshToken = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        const user = req.user
+        if (!user) {
+            return next({ statusCode: 401, message: "Invalid token" });
+        }
+        const newToken = jwt.sign(
+            {
+                user_id: user.user_id,
+                role: user.role,
+                tenant_id: user.tenant_id,
+                subdomain: user.subdomain,
+            },
+            process.env.JWT_SECRET as string,
+            { expiresIn: "15m" }
+        );
+        res.status(200).json({
+            message: "Token refreshed",
+            token: newToken,
+        });
+    } catch (error: any) {
+        next({ statusCode: 500, message: error.message || "internal server" });
     }
 };
