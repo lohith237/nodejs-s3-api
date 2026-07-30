@@ -41,48 +41,32 @@ export const createUser = async (req: Request, res: Response, next: NextFunction
     }
 };
 export const Login = async (req: Request, res: Response, next: NextFunction) => {
-    try {
-        const { email, password } = req.body;
-        const subdomain = req.headers.subdomain as string;
-        if (!subdomain) {
-            return next({ statusCode: 400, message: "Subdomain header missing" });
-        }
-        const db = await resolveDB("master");
-        const User = getUserModel(db);
-        const existUser = await User.findOne({ email });
-        if (!existUser) {
-            return next({ statusCode: 400, message: "Invalid credentials" });
-        }
-        if (existUser.subdomain !== subdomain) {
-            return next({ statusCode: 403, message: "Unauthorized client domain" });
-        }
-        if (!existUser.is_active) {
-            return next({ statusCode: 403, message: "Account is inactive" });
-        }
-        const isMatch = await existUser.compare_password(password as string);
-        if (!isMatch) {
-            return next({ statusCode: 400, message: "Invalid credentials" });
-        }
-        const token = jwt.sign(
-            {
-                user_id: existUser._id,
-                role: existUser.role,
-                tenant_id: existUser.tenant_id,
-                subdomain: existUser.subdomain,
-            },
-            process.env.JWT_SECRET as string,
-            {
-                expiresIn: "15m",
-            }
-        );
-        res.status(200).json({
-            message: "Login success",
-            user: existUser,
-            token,
-        });
-    } catch (error: any) {
-        next({ statusCode: 500, message: error.message || "internal server" });
+  try {
+    const { password } = req.body;
+    const login_user = req.login_user;
+    const login_role = req.login_role;
+    if (!login_user.is_active) {
+      return next({ statusCode: 403, message: "Account is inactive" });
     }
+    const isMatch = await login_user.compare_password(password);
+    if (!isMatch) {
+      return next({ statusCode: 400, message: "Invalid credentials" });
+    }
+    const token = jwt.sign(
+      {
+        user_id: login_user._id,
+        role: login_role,
+        tenant_id: req.tenant._id,
+        subdomain: req.tenant.subdomain,
+      },
+      process.env.JWT_SECRET as string,
+      { expiresIn: "15m" }
+    );
+
+    res.status(200).json({ message: "Login success", user: login_user, token });
+  } catch (error: any) {
+    next({ statusCode: 500, message: error.message || "internal server" });
+  }
 };
 export const getAllUsers = async (req: Request, res: Response, next: NextFunction) => {
     try {
