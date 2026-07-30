@@ -19,7 +19,8 @@ declare global {
 
 const resolveTenant = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const subdomain = req.headers.subdomain as string;
+    const raw_subdomain = req.headers.subdomain as string;
+    const subdomain = raw_subdomain.split(",")[0].trim();
     if (!subdomain) return next({ statusCode: 400, message: "Subdomain header missing" });
     const master_db = await resolveDB("master");
     const User = getUserModel(master_db);
@@ -39,6 +40,7 @@ const findLoginUser = async (req: Request, res: Response, next: NextFunction) =>
     if (tenant.email === email) {
       req.login_user = tenant;
       req.login_role = tenant.role;
+      console.log("MATCHED CLIENT:", tenant.email);
       return next();
     }
     const tenant_db = await resolveDB(tenant._id.toString());

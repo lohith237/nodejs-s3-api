@@ -65,6 +65,7 @@ export const Login = async (req: Request, res: Response, next: NextFunction) => 
 
     res.status(200).json({ message: "Login success", user: login_user, token });
   } catch (error: any) {
+    console.log(error)
     next({ statusCode: 500, message: error.message || "internal server" });
   }
 };
