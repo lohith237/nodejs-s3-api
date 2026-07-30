@@ -58,7 +58,7 @@ const findLoginUser = async (req: Request, res: Response, next: NextFunction) =>
       req.login_role = employee.role;
       return next();
     }
-    return next({ statusCode: 401, message: "Invalid credentials" });
+    return next({ statusCode: 400, message: "Invalid credentials" });
   } catch (error) {
     next({ statusCode: 500, message: "Login lookup failed" });
   }
